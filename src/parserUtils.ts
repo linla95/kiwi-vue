@@ -38,3 +38,13 @@ export function trimWhiteSpace(code: string, startPos: vscode.Position, endPos: 
     trimEnd: new vscode.Position(endLine, endCol)
   }
 }
+export function trimSpacePosition (element: any) {
+  let str = element.text
+  let value = element.text.trim()
+  let offset = str.indexOf(value)
+  const activeEditor = vscode.window.activeTextEditor;
+  return {
+    trimSpaceStartPos: activeEditor.document.positionAt(offset + element.start),
+    trimSpaceEndPos: activeEditor.document.positionAt(offset + element.start + value.length)
+  }
+}

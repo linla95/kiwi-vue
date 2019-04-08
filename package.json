@@ -113,6 +113,7 @@
     "minimatch": "^3.0.4",
     "prettier": "^1.16.4",
     "ts-node": "^6.0.3",
-    "typescript": "^2.8.3"
+    "typescript": "^2.8.3",
+    "vue-template-compiler": "^2.6.10"
   }
 }
