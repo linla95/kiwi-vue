@@ -195,7 +195,7 @@ function findTextInVue (code, fileName) {
               matches.push({
                 range,
                 text: realStr,
-                isString: true
+                isVueTemplate: true
               })
             }
           })
@@ -204,13 +204,16 @@ function findTextInVue (code, fileName) {
       // 处理元素的中文属性
       if (Array.isArray(element.attrsList)) {
         element.attrsList.forEach(attr => {
+          console.log(attr)
           if(attr.value.match(DOUBLE_BYTE_REGEX)) {
             let startPos = activeEditor.document.positionAt(attr.end - 1 - attr.value.length)
             let endPos = activeEditor.document.positionAt(attr.end - 1)
             let range = new vscode.Range(startPos, endPos)
             matches.push({
               range,
-              text: attr.value
+              text: attr.value,
+              isVueTemplate: true,
+              isVueAttr: true
             })              
           }
         })
@@ -248,7 +251,8 @@ function findTextInVue (code, fileName) {
           matches.push({
             range,
             text,
-            isString: true
+            isString: true,
+            isVueJsx: true
           });
         }
         break;
@@ -273,7 +277,8 @@ function findTextInVue (code, fileName) {
               matches.push({
                 range,
                 text: text.trim(),
-                isString: false
+                isString: false,
+                isVueJsx: true
               });
             }
           }
