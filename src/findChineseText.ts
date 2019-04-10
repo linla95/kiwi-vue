@@ -170,37 +170,75 @@ function findTextInVue (code, fileName) {
   // 1.查找template里的中文
   const vueAst = vueCompiler.compile(code, {outputSourceRange: true}).ast
   let QUOTE = /([\'\"])(.*?)[\'\"]/g
+  let EXP = /\{\{([^}]*)\}\}/g // 找到表达式{{xxxxxx}}
   function visitVueAst (nodes: Array<any>) {
     nodes.forEach(element => {
-      // template中的处理文字
       if (element.text && element.text.trim()) {
-        if (element.static || !element.text.match(QUOTE)) {
-          let {trimSpaceStartPos, trimSpaceEndPos} = trimSpacePosition(element)
-          let range = new vscode.Range(trimSpaceStartPos, trimSpaceEndPos)
-          matches.push({
-            range,
-            text: element.text.trim(),
-            isTemplatePureString: true // 需要转为 {{ $t('xxxx')}}
-          })
-        } else {
-          const strings = element.text.match(QUOTE)
-          Array.isArray(strings) && strings.forEach(str => {
-            if (str.match(DOUBLE_BYTE_REGEX)) {
-              let start = element.text.indexOf(str)
-              let end = start + str.length
-              // 加一减一去除引号
-              let realStr = element.text.substring(start+1, end-1)
-              let startPos = activeEditor.document.positionAt(element.start + start + 1)
-              let endPos = activeEditor.document.positionAt(element.start + end -1)              
-              let range = new vscode.Range(startPos, endPos)
+        let text = element.text
+        let offsetStart = element.start
+        let exps = text.match(EXP)
+        if (Array.isArray(exps)) { // 含有模板表达式
+          let expStart = 0
+          let expEnd = 0
+          let lastExpStart = 0
+          let lastExpEnd = 0        
+          exps.forEach((exp, index) => {
+            // 计算当前表达式开始和结束的位置
+            expStart = text.indexOf(exp)
+            expEnd = expStart + exp.length
+            // 匹配表达式中间部分的引号部分也就是字符串部分
+            let strings = exp.match(QUOTE)
+            Array.isArray(strings) && strings.forEach(str => {
+              // 这个字符串含有中文 找到了
+              if (str.match(DOUBLE_BYTE_REGEX)) {
+                let start = exp.indexOf(str)
+                let end = start + str.length
+                // 加一减一去除引号 获取表达式里面的纯字符部分
+                let realStr = exp.substring(start+1, end-1)
+                // 真实的位置为
+                // 当前元素节点的偏移量（offsetStart）+
+                // 当前表达式在当前元素内容的偏移量（expStart）+ 
+                // 中文字符串在当前表达式的偏移量
+                let startPos = activeEditor.document.positionAt(offsetStart + expStart + start + 1)
+                let endPos = activeEditor.document.positionAt(offsetStart + expStart + end -1)
+                let range = new vscode.Range(startPos, endPos)
+                matches.push({
+                  range,
+                  text: realStr
+                })
+              }
+            })
+            // 表达式之间的字符串部分
+            let spaceString = text.substring(lastExpEnd, expStart)
+            if (spaceString.match(DOUBLE_BYTE_REGEX)) {
+              let {trimSpaceStartPos, trimSpaceEndPos} = trimSpacePosition({
+                text: spaceString,
+                start: offsetStart + lastExpEnd,
+                end: offsetStart + expStart
+              })
+              let range = new vscode.Range(trimSpaceStartPos, trimSpaceEndPos)
               matches.push({
                 range,
-                text: realStr
+                text: spaceString.trim(),
+                isTemplatePureString: true // 需要转为 {{ $t('xxxx')}}
               })
             }
+            lastExpStart = expStart
+            lastExpEnd = expEnd
           })
+        } else {
+          if (text.match(DOUBLE_BYTE_REGEX)) { // 文字中包含有中文的就算
+            let {trimSpaceStartPos, trimSpaceEndPos} = trimSpacePosition(element)
+            let range = new vscode.Range(trimSpaceStartPos, trimSpaceEndPos)
+            matches.push({
+              range,
+              text: element.text.trim(),
+              isTemplatePureString: true // 需要转为 {{ $t('xxxx')}}
+            })
+          }
         }
       }
+      
       // 处理元素的中文属性
       if (Array.isArray(element.attrsList)) {
         element.attrsList.forEach(attr => {

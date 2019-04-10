@@ -1,9 +1,9 @@
 {
-  "name": "vscode-i18n-linter",
-  "displayName": "kiwi-linter",
-  "description": "A VSCode extension to identify and extract string literals for js(x)/ts(x) files",
-  "version": "1.2.6",
-  "publisher": "undefinedvs",
+  "name": "kiwi-vue",
+  "displayName": "kiwi-vue-lla",
+  "description": "A VSCode extension to identify and extract string literals for js(x)/ts(x)/vue files",
+  "version": "0.0.3",
+  "publisher": "lla",
   "engines": {
     "vscode": "^1.18.0"
   },
@@ -88,7 +88,7 @@
     ]
   },
   "keywords": [
-    "React",
+    "vue",
     "i18n"
   ],
   "scripts": {
