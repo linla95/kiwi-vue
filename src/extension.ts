@@ -3,26 +3,21 @@
  * @desc 插件主入口
  */
 import * as vscode from 'vscode';
-import * as minimatch from 'minimatch';
 import * as _ from 'lodash';
-import * as fs from 'fs';
 import { getSuggestLangObj } from './getLangData';
-import { I18N_GLOB } from './const';
+import { I18N_GLOB_PATH, COMMON } from './const';
 import { findAllI18N, findI18N } from './findAllI18N';
 import { findMatchKey } from './utils';
 import { triggerUpdateDecorations } from './chineseCharDecorations';
 import { TargetStr } from './define';
-import { replaceAndUpdate } from './replaceAndUpdate';
+import { getCurrentFileNameWithoutLanguageId } from './file';
+import { replaceAndUpdateInVue } from './replaceAndUpdate';
 
 /**
  * 主入口文件
  * @param context
  */
 export function activate(context: vscode.ExtensionContext) {
-  // if (!fs.existsSync(`${vscode.workspace.rootPath}/.kiwi/config.json`)) {
-  //   /** 存在配置文件则开启 */
-  //   return;
-  // }
   console.log('Congratulations, your extension "kiwi-linter" is now active!');
   context.subscriptions.push(
     vscode.commands.registerCommand(
@@ -48,7 +43,7 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   // 监听 langs/ 文件夹下的变化，重新生成 finalLangObj
-  const watcher = vscode.workspace.createFileSystemWatcher(I18N_GLOB);
+  const watcher = vscode.workspace.createFileSystemWatcher(I18N_GLOB_PATH);
   context.subscriptions.push(
     watcher.onDidChange(() => (finalLangObj = getSuggestLangObj()))
   );
@@ -73,44 +68,52 @@ export function activate(context: vscode.ExtensionContext) {
           { scheme: 'file', language: 'typescript' },
           { scheme: 'file', language: 'javascriptreact' },
           { scheme: 'file', language: 'javascript' },
-          { scheme: 'file', language: 'vue' },
+          { scheme: 'file', language: 'vue' } // lla 添加对vue支持
         ],
         {
           provideCodeActions: function(document, range, context, token) {
-            let editor = vscode.window.activeTextEditor;
-            let rangeToReplace: vscode.Range = editor.selection;
-            let text = editor.document.getText(rangeToReplace);
-            let targetStr = {
-              text: text,
-              range: rangeToReplace
-            }           
+            const targetStr = targetStrs.find(
+              t => range.intersection(t.range) !== undefined
+            );
             if (targetStr) {
+              const sameTextStrs = targetStrs.filter(
+                t => t.text === targetStr.text
+              );
               const text = targetStr.text;
+
               const actions = [];
-              for (const  key in finalLangObj) {
+              for (const key in finalLangObj) {
                 if (finalLangObj[key] === text) {
                   actions.push({
-                    title: `抽取为 \`I18N.${key}\``,
+                    title: `抽取为 '${key}'`,
                     command: 'vscode-i18n-linter.extractI18N',
                     arguments: [
                       {
-                        targets: text,
-                        varName: `I18N.${key}`
+                        targets: sameTextStrs,
+                        varName: key
                       }
                     ]
                   });
                 }
               }
-
-              return actions.concat({
-                title: `抽取为自定义 I18N 变量`,
+              return actions.concat([{
+                title: `抽取为自定义变量（共${sameTextStrs.length}处）`,
                 command: 'vscode-i18n-linter.extractI18N',
                 arguments: [
                   {
-                    targets: text                
+                    targets: sameTextStrs
                   }
                 ]
-              });
+              },{
+                title: `抽取为公共变量${COMMON}.XXX`,
+                command: 'vscode-i18n-linter.extractI18N',
+                arguments: [
+                  {
+                    targets: sameTextStrs,
+                    isCommon: true // 抽取为公共变量
+                  }
+                ]
+              }]);
             }
           }
         }
@@ -126,19 +129,21 @@ export function activate(context: vscode.ExtensionContext) {
         if (args.varName) {
           return resolve(args.varName);
         }
-
-        const currentPath = activeEditor.document.fileName;
-        let dirs = currentPath.split('\\') // 获取当前文件目录
-        let fileName = dirs.pop().split('.')[0] // 获取文件名
+        let moduleName
+        if (args.isCommon) {
+          moduleName = COMMON
+        } else {
+          moduleName = getCurrentFileNameWithoutLanguageId()
+        }
         // 否则要求用户输入变量名
         return resolve(
           vscode.window.showInputBox({
             prompt:
-              '请输入变量名，格式 `[file].[key]`，按 <回车> 启动替换',
-            value: `${fileName.toLocaleLowerCase()}.`,
+              '请输入变量名，格式 `[ModulefileName].[key]`，按 <回车> 启动替换',
+            value: `${moduleName}.`,
             validateInput(input) {
-              if (!input.match(/^\w+\.\w+/)) {
-                return '变量名格式错误';
+              if (!input.match(/\w+\.\w+/)) {
+                return '变量名，格式 `[ModulefileName].[key]`';
               }
             }
           })
@@ -151,15 +156,18 @@ export function activate(context: vscode.ExtensionContext) {
         const finalArgs = Array.isArray(args.targets)
           ? args.targets
           : [args.targets];
+        if (finalLangObj[val] !== undefined && finalLangObj[val] !== finalArgs[0].text) {
+          vscode.window.showInformationMessage(`${val}已经存在，值为${finalLangObj[val]}`);
+          return
+        }          
         return finalArgs
           .reduce((prev: Promise<any>, curr: TargetStr, index: number) => {
             return prev.then(() => {
-              const isBase = val.startsWith('base.');
-              return replaceAndUpdate(
+              let isExsit = finalLangObj[val] // 是否在旧的文件中已经存在翻译了
+              return replaceAndUpdateInVue(
                 curr,
                 val,
-                isBase,
-
+                isExsit
               );
             });
           }, Promise.resolve())

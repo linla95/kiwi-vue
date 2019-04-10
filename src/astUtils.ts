@@ -16,8 +16,7 @@ export function removeFileComment(code: string, fileName: string) {
     code,
     ts.ScriptTarget.ES2015,
     true,
-    ts.ScriptKind.JS
-    //fileName.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
+    fileName.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
   );
   return printer.printFile(sourceFile);
 }

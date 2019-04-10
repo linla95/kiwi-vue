@@ -5,7 +5,7 @@
 import * as ts from 'typescript';
 import * as vscode from 'vscode';
 import * as _ from 'lodash';
-import { getI18N } from './getLangData';
+import { getSuggestLangObj } from './getLangData';
 
 class Cache {
   memories = [] as Array<{ code: string; positions: Position[] }>;
@@ -39,35 +39,25 @@ export class Position {
 
 /** 使用正则匹配{{}} */
 function getRegexMatches(I18N, code: string) {
-  const lines = code.split('\n');
+  const lines = code.split(/\r\n|\r|\n/);
   const positions: Position[] = [];
-  /** 匹配{{I18N.}} */
-  const reg = new RegExp(/I18N.(.*)/);
-  const normalReg = new RegExp(/I18N.(.*)/);
+  /** 匹配{{$t.}} */
+  const reg = new RegExp(/\$t\(([^)]*)\)/);
   (lines || []).map((line, index) => {
-    const match = reg.exec(line);
-    let exps = _.get(match, [1]);
-    if (!exps) {
-      exps = _.get(normalReg.exec(line), [1]);
-    }
-    if (exps) {
-      exps = exps.trim();
-      exps = exps.split('}')[0];
-      exps = exps.split(')')[0];
-      exps = exps.split(',')[0];
-      exps = exps.split(';')[0];
-      exps = exps.split('"')[0];
-      exps = exps.split('\'')[0];
-      exps = exps.split(' ')[0];
-      const code = `I18N.${exps}`;
-      const position = new Position();
-      const transformedCn = _.get(I18N, exps.split('.'));
-      if (transformedCn) {
-        position.cn = transformedCn;
-        (position as any).line = index;
-        position.code = code;
-        positions.push(position);
-      }
+    let matchs = line.match(reg)
+    if (matchs) {
+      let exps = line.match(reg)[1]
+      if (exps) {
+        exps = exps.split("'")[1]
+        const position = new Position();
+        const transformedCn = _.get(I18N, exps);
+        if (transformedCn) {
+          position.cn = transformedCn;
+          (position as any).line = index;
+          position.code = code;
+          positions.push(position);
+        }
+      }      
     }
   });
   return positions;
@@ -83,7 +73,7 @@ export function findI18NPositions(code: string) {
     return cachedPoses;
   }
 
-  const I18N = getI18N();
+  const I18N = getSuggestLangObj();
   const positions = [] as Position[];
 
   const regexMatches = getRegexMatches(I18N, code);
