@@ -174,12 +174,13 @@ function findTextInVue (code, fileName) {
     nodes.forEach(element => {
       // template中的处理文字
       if (element.text && element.text.trim()) {
-        if (element.static) {
+        if (element.static || !element.text.match(QUOTE)) {
           let {trimSpaceStartPos, trimSpaceEndPos} = trimSpacePosition(element)
           let range = new vscode.Range(trimSpaceStartPos, trimSpaceEndPos)
           matches.push({
             range,
-            text: element.text.trim()
+            text: element.text.trim(),
+            isTemplatePureString: true // 需要转为 {{ $t('xxxx')}}
           })
         } else {
           const strings = element.text.match(QUOTE)
@@ -194,8 +195,7 @@ function findTextInVue (code, fileName) {
               let range = new vscode.Range(startPos, endPos)
               matches.push({
                 range,
-                text: realStr,
-                isVueTemplate: true
+                text: realStr
               })
             }
           })
@@ -204,16 +204,16 @@ function findTextInVue (code, fileName) {
       // 处理元素的中文属性
       if (Array.isArray(element.attrsList)) {
         element.attrsList.forEach(attr => {
-          console.log(attr)
           if(attr.value.match(DOUBLE_BYTE_REGEX)) {
             let startPos = activeEditor.document.positionAt(attr.end - 1 - attr.value.length)
             let endPos = activeEditor.document.positionAt(attr.end - 1)
             let range = new vscode.Range(startPos, endPos)
+            attr.range = new vscode.Range(activeEditor.document.positionAt(attr.start), activeEditor.document.positionAt(attr.end))
             matches.push({
               range,
               text: attr.value,
-              isVueTemplate: true,
-              isVueAttr: true
+              isVueAttr: true,
+              attr: attr
             })              
           }
         })
