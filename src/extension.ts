@@ -7,7 +7,7 @@ import * as _ from 'lodash';
 import { getSuggestLangObj } from './getLangData';
 import { I18N_GLOB_PATH, COMMON } from './const';
 import { findAllI18N, findI18N } from './findAllI18N';
-import { findMatchKey } from './utils';
+import { getCurrentDirI18NPath } from './utils';
 import { triggerUpdateDecorations } from './chineseCharDecorations';
 import { TargetStr } from './define';
 import { getCurrentFileNameWithoutLanguageId } from './file';
@@ -42,8 +42,11 @@ export function activate(context: vscode.ExtensionContext) {
     )
   );
 
-  // 监听 langs/ 文件夹下的变化，重新生成 finalLangObj
+  // 监听公共i18文件和当前文件夹下的i18n.js文件
+  // 公共i18n
   const watcher = vscode.workspace.createFileSystemWatcher(I18N_GLOB_PATH);
+  let dirI18nWatcher
+  let subscriptions = []
   context.subscriptions.push(
     watcher.onDidChange(() => (finalLangObj = getSuggestLangObj()))
   );
@@ -53,6 +56,8 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     watcher.onDidDelete(() => (finalLangObj = getSuggestLangObj()))
   );
+  // 监听当前文件夹下的i18n
+  watchCurrentI18NFile()
   finalLangObj = getSuggestLangObj();
 
   // 识别到出错时点击小灯泡弹出的操作
@@ -182,64 +187,15 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // 使用 cmd + shift + p 执行的公共文案替换
-  // context.subscriptions.push(
-  //   vscode.commands.registerCommand('vscode-i18n-linter.replaceCommon', () => {
-  //     const commandKeys = Object.keys(finalLangObj).filter(k =>
-  //       k.includes('common.')
-  //     );
-  //     if (targetStrs.length === 0 || commandKeys.length === 0) {
-  //       vscode.window.showInformationMessage('没有找到可替换的公共文案');
-  //       return;
-  //     }
-
-  //     const replaceableStrs = targetStrs.reduce((prev, curr) => {
-  //       const key = findMatchKey(finalLangObj, curr.text);
-  //       if (key && key.startsWith('common.')) {
-  //         return prev.concat({
-  //           target: curr,
-  //           key
-  //         });
-  //       }
-
-  //       return prev;
-  //     }, []);
-
-  //     if (replaceableStrs.length === 0) {
-  //       vscode.window.showInformationMessage('没有找到可替换的公共文案');
-  //       return;
-  //     }
-
-  //     vscode.window
-  //       .showInformationMessage(
-  //         `共找到 ${replaceableStrs.length} 处可自动替换的文案，是否替换？`,
-  //         { modal: true },
-  //         'Yes'
-  //       )
-  //       .then(action => {
-  //         if (action === 'Yes') {
-  //           replaceableStrs
-  //             .reduce((prev: Promise<any>, obj) => {
-  //               return prev.then(() => {
-  //                 return replaceAndUpdate(obj.target, `I18N.${obj.key}`, false);
-  //               });
-  //             }, Promise.resolve())
-  //             .then(() => {
-  //               vscode.window.showInformationMessage('替换完成');
-  //             })
-  //             .catch(e => {
-  //               vscode.window.showErrorMessage(e.message);
-  //             });
-  //         }
-  //       });
-  //   })
-  // );
-
   // 当 切换文档 的时候重新检测当前文档中的中文文案
   context.subscriptions.push(
     vscode.window.onDidChangeActiveTextEditor(editor => {
       activeEditor = editor;
       if (editor) {
+        // 重新监听 当前文件夹下的i18n变化
+        disposeCurrentI18NFileWatch()
+        watchCurrentI18NFile()
+        finalLangObj = getSuggestLangObj();
         triggerUpdateDecorations((newTargetStrs) => {
           targetStrs = newTargetStrs;
         });
@@ -257,4 +213,33 @@ export function activate(context: vscode.ExtensionContext) {
       }
     }, null)
   );
+  /**
+   * 监听当前文件夹下的i18n文件
+   */
+  function watchCurrentI18NFile () {
+    dirI18nWatcher = vscode.workspace.createFileSystemWatcher(getCurrentDirI18NPath());
+    let changWatcher = context.subscriptions.push(
+      dirI18nWatcher.onDidChange(() => (finalLangObj = getSuggestLangObj()))
+    );
+    let createWatcher = context.subscriptions.push(
+      dirI18nWatcher.onDidCreate(() => (finalLangObj = getSuggestLangObj()))
+    );
+    let deleteWatcher = context.subscriptions.push(
+      dirI18nWatcher.onDidDelete(() => (finalLangObj = getSuggestLangObj()))
+    );
+    subscriptions.push(...[changWatcher, createWatcher, deleteWatcher])
+    return dirI18nWatcher
+  }
+  // dispose 这个文件监听
+  function disposeCurrentI18NFileWatch () {
+    try {
+      subscriptions.forEach(watcher => {
+        watcher.dipose()
+      })
+      dirI18nWatcher.dipose()
+      subscriptions = []
+    } catch (error) {
+      
+    }
+  }  
 }
