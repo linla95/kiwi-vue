@@ -242,17 +242,43 @@ function findTextInVue (code, fileName) {
       // 处理元素的中文属性
       if (Array.isArray(element.attrsList)) {
         element.attrsList.forEach(attr => {
-          if(attr.value.match(DOUBLE_BYTE_REGEX)) {
-            let startPos = activeEditor.document.positionAt(attr.end - 1 - attr.value.length)
-            let endPos = activeEditor.document.positionAt(attr.end - 1)
-            let range = new vscode.Range(startPos, endPos)
-            attr.range = new vscode.Range(activeEditor.document.positionAt(attr.start), activeEditor.document.positionAt(attr.end))
-            matches.push({
-              range,
-              text: attr.value,
-              isVueAttr: true,
-              attr: attr
-            })              
+          if(attr.value.match(DOUBLE_BYTE_REGEX)) { //value值中含有中文
+            if (attr.name.includes(':')) { // attr是对象的形式 比如 :rule="{required: true, message: '呵呵呵'}"
+              let attrExpression = activeEditor.document.getText(new vscode.Range(activeEditor.document.positionAt(attr.start),
+              activeEditor.document.positionAt(attr.end)))
+              attrExpression = attrExpression.replace(/\r\n|\r|\n/, 'a') // TODO 待解决 只解决了window
+              let allQuotes = attr.value.match(QUOTE)
+              if (Array.isArray(allQuotes)) {
+                allQuotes.forEach(v => {
+                  if (v.match(DOUBLE_BYTE_REGEX)) {
+                    let pos = attrExpression.indexOf(v)
+                    // 加一减一去除引号 获取表达式里面的纯字符部分
+                    let realStr = v.substring(1, v.length-1)
+                    let startPos = activeEditor.document.positionAt(attr.start + pos + 1)
+                    let endPos = activeEditor.document.positionAt(attr.start + pos + v.length - 1)
+                    let range = new vscode.Range(startPos, endPos)
+                    attr.range = new vscode.Range(activeEditor.document.positionAt(attr.start), activeEditor.document.positionAt(attr.end))
+                    matches.push({
+                      range,
+                      text: realStr,
+                      isVueAttr: true,
+                      attr: attr
+                    })
+                  }
+                })
+              }  
+            } else { // 普通的 placeholder="呵呵"
+              let startPos = activeEditor.document.positionAt(attr.end - 1 - attr.value.length)
+              let endPos = activeEditor.document.positionAt(attr.end - 1)
+              let range = new vscode.Range(startPos, endPos)
+              attr.range = new vscode.Range(activeEditor.document.positionAt(attr.start), activeEditor.document.positionAt(attr.end))
+              matches.push({
+                range,
+                text: attr.value,
+                isVueAttr: true,
+                attr: attr
+              })
+            }
           }
         })
       }

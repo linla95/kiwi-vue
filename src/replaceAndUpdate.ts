@@ -29,10 +29,13 @@ export function replaceAndUpdateInVue (
     finalReplaceVal = `{{$t('${keyName}')}}`
   }
   // vue的template中的属性
+  // 两种情况 
   if (targetStr.isVueAttr) {
-    finalReplaceVal = `:${targetStr.attr.name}="$t('${keyName}')"`
-    start = targetStr.attr.range.start
-    end = targetStr.attr.range.end
+    if (!targetStr.attr.name.includes(':')) {
+      finalReplaceVal = `:${targetStr.attr.name}="$t('${keyName}')"`
+      start = targetStr.attr.range.start
+      end = targetStr.attr.range.end
+    }
   }
 
   if (targetStr.isVueDirective) {
