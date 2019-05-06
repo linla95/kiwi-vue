@@ -2,7 +2,7 @@
   "name": "kiwi-vue",
   "displayName": "kiwi-vue-lla",
   "description": "A VSCode extension to identify and extract string literals for js(x)/ts(x)/vue files",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "publisher": "lla",
   "engines": {
     "vscode": "^1.18.0"

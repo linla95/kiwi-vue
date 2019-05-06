@@ -306,6 +306,7 @@ function findTextInVue (code, fileName) {
         /** 判断 Ts 中的字符串含有中文 */
         const { text } = node as ts.StringLiteral;
         if (text.match(DOUBLE_BYTE_REGEX)) {
+          console.log('stringLitteral' + text)
           const start = node.getStart();
           const end = node.getEnd();
           /** 加一，减一的原因是，去除引号 */
@@ -331,6 +332,7 @@ function findTextInVue (code, fileName) {
             const noCommentText = removeFileComment(text, fileName);
 
             if (noCommentText.match(DOUBLE_BYTE_REGEX)) {
+              console.log('JsxText' + text)
               const start = child.getStart();
               const end = child.getEnd();
               const startPos = activeEditor.document.positionAt(scriptOffset + start);

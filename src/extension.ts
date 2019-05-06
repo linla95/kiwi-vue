@@ -10,7 +10,7 @@ import { findAllI18N, findI18N } from './findAllI18N';
 import { getCurrentDirI18NPath } from './utils';
 import { triggerUpdateDecorations } from './chineseCharDecorations';
 import { TargetStr } from './define';
-import { getCurrentFileNameWithoutLanguageId } from './file';
+import { getCurrentFileNameWithoutLanguageId,getCurrentPath } from './file';
 import { replaceAndUpdateInVue } from './replaceAndUpdate';
 
 /**
@@ -139,6 +139,16 @@ export function activate(context: vscode.ExtensionContext) {
           moduleName = COMMON
         } else {
           moduleName = getCurrentFileNameWithoutLanguageId()
+          if (moduleName == 'index') {
+            let path = getCurrentPath()
+            let paths = path.split('\\')
+            let name = ''
+            name += paths.pop().replace(/( |^)[a-z]/g, function(s) {
+              return s.toUpperCase()
+            })
+            name = paths.pop() + name
+            moduleName = name
+          }
         }
         // 否则要求用户输入变量名
         return resolve(
